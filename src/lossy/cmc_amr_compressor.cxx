@@ -564,7 +564,7 @@ cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function
     compresseion_results.close();
 
     /* Write out the forest(s) with the compressed data */
-    cmc_t8_write_forest_all_vars(amr_data->t8_data, file_prefix);
+    //cmc_t8_write_forest_all_vars(amr_data->t8_data, file_prefix);
     #endif
     #endif
 }
