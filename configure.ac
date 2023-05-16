@@ -326,9 +326,9 @@ if test "x$CMC_WITH_T8CODE" != xno ; then
     AC_LANG_PUSH([C])
     AC_LINK_IFELSE([AC_LANG_PROGRAM(
         [[
-        #include <t8_forest.h>
+        #include <t8.h>
         ]],[[
-        t8_forest_t forest;
+        t8_gloidx_t example_t8_integer;
         ]])],
         [AC_MSG_CHECKING([linkage with t8code])
         AC_MSG_RESULT([successful])],
