@@ -1,11 +1,20 @@
 bin_PROGRAMS += example/lossy_amr_nc_compression/cmc_lossy_amr_nc_compression \
-example/lossless/cmc_lzss
+example/lossless/cmc_lzss \
+example/common/cmc_t8_refine_coarsen_mesh \
+example/common/cmc_t8_refine_mesh_with_search \
+example/interpolation_by_search 
 
 example_lossy_amr_nc_compression_cmc_lossy_amr_nc_compression_SOURCES = example/lossy_amr_nc_compression/cmc_lossy_amr_nc_compression.cxx
 
 example_lossless_cmc_lzss_SOURCES = example/lossless/cmc_lzss.cxx
 
-if ENABLE_FORTRAN
+example_common_cmc_t8_refine_coarsen_mesh_SOURCES = example/common/cmc_t8_refine_coarsen_example.cxx
+
+example_common_cmc_t8_refine_mesh_with_search_SOURCES = example/common/cmc_t8_refine_mesh_with_search.cxx 
+
+example_interpolation_by_search_SOURCES = example/interpolation_by_search.cxx
+
+if ENABLE_FORTRAN 
 bin_PROGRAMS += example/lossy_amr_nc_compression/cmc_fortran_lossy_amr_compression
 example_lossy_amr_nc_compression_cmc_fortran_lossy_amr_compression_SOURCES = example/lossy_amr_nc_compression/cmc_fortran_lossy_amr_compression.f90
 endif

@@ -67,6 +67,123 @@ var_array_t::operator=(const var_array_t& array)
 }
 
 
+std::vector<double>
+var_array_t::retrieve_double_vector() const
+{
+    std::vector<double> transformed_vector;
+    transformed_vector.reserve(data->num_elements);
+
+    switch(data->type)
+    {
+        case CMC_INT32_T:
+        {
+            int32_t* ptr{static_cast<int32_t*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            float* ptr{static_cast<float*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            double* ptr{static_cast<double*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            int16_t* ptr{static_cast<int16_t*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            int64_t* ptr{static_cast<int64_t*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            uint64_t* ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            uint32_t* ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            int8_t* ptr{static_cast<int8_t*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+            uint8_t* ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            uint16_t* ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_BYTE:
+            cmc_err_msg("Cannot transform byte.");
+        break;
+        case CMC_CHAR:
+        {
+            char* ptr{static_cast<char*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+    }
+
+    return transformed_vector;
+}
+
 #if 0
 switch (data->type)
 {

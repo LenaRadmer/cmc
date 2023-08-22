@@ -50,7 +50,7 @@ public:
 
     void axpy_scalar(const cmc_universal_type_t& scale_factor, const cmc_universal_type_t& add_offset);    
     void axpy_scalar_with_missing_vals(const cmc_universal_type_t& scale_factor, const cmc_universal_type_t& add_offset, const cmc_universal_type_t& missing_value);
-    
+    std::vector<double> retrieve_double_vector() const;
     // Opaque pointer to the internal data structure
     struct var_array* data{nullptr};
 private:

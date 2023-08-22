@@ -42,7 +42,7 @@ main(int argc, char* argv[])
     amr_data = cmc_create_amr_compression_data(nc_data, MPI_COMM_WORLD);
 
     /* Set a compression criterium - e.g. error threshold woth a predefined tolerance */
-    cmc_amr_pre_setup_set_compression_criterium_error_threshold(amr_data, 0.02);
+    cmc_amr_pre_setup_set_compression_criterium_error_threshold(amr_data, 0.01);
 
     /* Setup the compression for a given 'compression mode' */
     cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_2D);

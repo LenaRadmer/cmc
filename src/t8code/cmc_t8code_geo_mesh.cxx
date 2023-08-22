@@ -64,8 +64,8 @@ data_layout_to_string(const DATA_LAYOUT layout)
 }
 
 /** Coarsen the initial uniform mesh which encloses the geo-spatial data */
-static t8_forest_t
-cmc_t8_coarsen_geo_mesh(cmc_t8_data& t8_data, t8_forest_t initial_forest, const int initial_refinement_lvl, const int var_id = -1)
+t8_forest_t
+cmc_t8_coarsen_geo_mesh(cmc_t8_data& t8_data, t8_forest_t initial_forest, const int initial_refinement_lvl, const int var_id)
 {
     t8_forest_t forest{initial_forest};
     t8_forest_t forest_adapt;

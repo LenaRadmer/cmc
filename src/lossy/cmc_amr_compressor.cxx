@@ -14,6 +14,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <chrono>
 
 /* Class definitions */
 struct cmc_amr_data
@@ -470,7 +471,7 @@ cmc_amr_setup_compression(cmc_amr_data_t amr_data, CMC_AMR_COMPRESSION_MODE comp
         }
     }
     /* Write out the forest with the variable's data at the beginning of the compression process */
-    //cmc_t8_write_forest_all_vars(amr_data->t8_data, file_prefix); 
+    cmc_t8_write_forest_all_vars(amr_data->t8_data, file_prefix); 
     #endif
     #endif
 }
@@ -578,7 +579,21 @@ cmc_amr_decompress(cmc_amr_data_t amr_data)
     cmc_debug_msg("Decompression of data starts...");
 
     /* Refine the data of all variables to corresponding intial mesh */
+    /* Get the current time point before the iterative decompression */
+    auto start_time_iterative = std::chrono::high_resolution_clock::now();
+    #if 0
     cmc_t8_refine_to_initial_level(amr_data->t8_data);
+    #else
+    cmc_t8_refine_to_initial_level_by_search(amr_data->t8_data);
+    #endif
+    
+    /* Get the time point after the iterative decompression */
+    auto end_time_iterative = std::chrono::high_resolution_clock::now();
+
+    /* Calculate the duration of the iterative decompression */
+    auto duration_iterative = std::chrono::duration_cast<std::chrono::milliseconds>(end_time_iterative - start_time_iterative);
+
+    cmc_debug_msg("The duration of the decompression took: ", duration_iterative.count(), "ms"); //Eventually change milliseconds to milliseconds or something else
 
     cmc_debug_msg("Decompression has been finished.");
     

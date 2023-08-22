@@ -24,7 +24,8 @@ src/component_interfaces/cmc_t8_nc.h \
 src/component_interfaces/cmc_t8_messy.h \
 src/lossy/cmc_amr_compressor.h \
 src/messy/cmc_messy.h \
-src/lossless/cmc_lzss.h
+src/lossless/cmc_lzss.h \
+example/common/cmc_t8_refine_coarsen_mesh.h
 
 if ENABLE_FORTRAN
 include_HEADERS += src/fortran_interfaces/cmcc.h \
@@ -47,7 +48,8 @@ src/component_interfaces/cmc_t8_nc.cxx \
 src/component_interfaces/cmc_t8_messy.cxx \
 src/lossy/cmc_amr_compressor.cxx \
 src/messy/cmc_messy.cxx \
-src/lossless/cmc_lzss.cxx
+src/lossless/cmc_lzss.cxx \
+example/common/cmc_t8_refine_coarsen_mesh.cxx
 
 if ENABLE_FORTRAN
 cmc_module_sources = src/fortran_interfaces/cmc_fortran.f90 \
