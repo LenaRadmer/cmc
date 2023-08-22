@@ -15,18 +15,36 @@ void
 cmc_geo_data_transform_3d_var_to_2d(cmc_t8_data_t t8_data, const int var_id, const DATA_LAYOUT preferred_layout);
 
 void
-cmc_t8_geo_data_set_error_criterium(cmc_t8_data_t t8_data, const double maximum_error_tolerance);
+cmc_t8_geo_data_set_split_variable(cmc_t8_data_t t8_data, const int var_id, const DATA_LAYOUT preferred_layout);
+
+void
+cmc_t8_geo_data_set_relative_error_criterium(cmc_t8_data_t t8_data, const double maximum_error_tolerance);
+
+void
+cmc_t8_geo_data_set_absolute_error_criterium(cmc_t8_data_t t8_data, const double maximum_error_tolerance);
+
+void
+cmc_t8_geo_data_reset_compression_settigs(cmc_t8_data_t t8_data);
 
 void
 cmc_t8_geo_data_set_exclude_area(cmc_t8_data_t t8_data, const CMC_COORD_IDS coord_id, const cmc_universal_type_t& start_value, const cmc_universal_type_t& end_value);
 
 void
-cmc_t8_coarsen_data(cmc_t8_data_t t8_data, t8_forest_adapt_t adapt_function, t8_forest_replace_t interpolation_function);
+cmc_t8_coarsen_data(cmc_t8_data_t t8_data, t8_forest_adapt_t adapt_function, cmc_t8_forest_interpolation_t interpolation_function);
 
 void
 cmc_t8_refine_to_initial_level(cmc_t8_data_t t8_data);
 
 void
 cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data);
+
+void
+cmc_t8_geo_data_split_variables(cmc_t8_data_t t8_data);
+
+void
+cmc_t8_geo_data_distribute_initially(cmc_t8_data_t t8_data);
+
+void
+cmc_t8_geo_data_distribute_and_apply_ordering(cmc_t8_data_t t8_data);
 
 #endif /* CMC_T8CODE_GEO_DATA_H */

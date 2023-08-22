@@ -60,13 +60,42 @@ cmc_amr_pre_setup_split_3D_variable(cmc_amr_data_t amr_data, const int var_id, c
 
 /**
  * @brief This function sets an error threshold compression criterium for the lossy AMR compressor. The data of all variables will be compressed compliant to the this threshold.
- * Precisly, the introduced data loss during the compression will not excced @var maximum_error_tolerance.
+ * Precisly, the introduced relative data loss during the compression will not excced @var maximum_error_tolerance.
  * 
  * @param amr_data A pointer to a @struct cmc_amr_data holding the variables defined on a geo-spatial domain and information about the coordinate system
- * @param maximum_error_tolerance Sets the maximum data loss for the compression in percent. The value should be a decimal value, e.g. 0.01 (-> equals a maximum data loss of 1%)
+ * @param maximum_rel_error_tolerance Sets the maximum relative data loss for the compression in percent. The value should be a decimal value, e.g. 0.01 (-> equals a maximum data loss of 1%)
  */
 void
-cmc_amr_pre_setup_set_compression_criterium_error_threshold(cmc_amr_data_t amr_data, const double maximum_error_tolerance);
+cmc_amr_pre_setup_set_compression_criterium_relative_error_threshold(cmc_amr_data_t amr_data, const double maximum_rel_error_tolerance);
+
+/**
+ * @brief This function sets an error threshold compression criterium for the lossy AMR compressor. The data of all variables will be compressed compliant to the this threshold.
+ * Precisly, the introduced data absolute loss during the compression will not excced @var maximum_error_tolerance.
+ * 
+ * @param amr_data A pointer to a @struct cmc_amr_data holding the variables defined on a geo-spatial domain and information about the coordinate system
+ * @param maximum_abs_error_tolerance Sets the maximum absolute data loss for the compression
+ */
+void
+cmc_amr_pre_setup_set_compression_criterium_absolute_error_threshold(cmc_amr_data_t amr_data, const double maximum_abs_error_tolerance);
+
+/**
+ * @brief Resets all the previous supplied compression settings which were set via the 'cmc_amr_pre_setup_...()'-functions
+ *
+ * @param amr_data A pointer to a @struct cmc_amr_data holding the variables defined on a geo-spatial domain which will be compressed and information about the coordinate system
+ */
+void
+cmc_amr_pre_setup_reset_compression_settings(cmc_amr_data_t amr_data);
+
+/**
+ * @brief This function sets whether or not the initial data is saved or lost during the compression.
+ * 
+ * @param flag_keep_initial_data A Value unequal to zero indicates that the data should be kept during the compression
+ *
+ * @note By default, the initial data is will vanish after the first adaptation/compression step and therefore is not kept.
+ * @note A benefit from keeping the data would be for example if a compression is directly followed by a decompression, we could afterwards verify the introduced data inaccuracy if the data was kept
+ */
+void
+cmc_amr_pre_setup_set_flag_in_order_to_keep_the_initial_data(cmc_amr_data_t amr_data, const int flag_keep_initial_data);
 
 /**
  * @brief This function sets an error threshold compression criterium for the lossy AMR compressor. The data of all variables will be compressed compliant to the this threshold.
@@ -94,7 +123,6 @@ cmc_amr_pre_setup_set_compression_criterium_exclude_area(cmc_amr_data_t amr_data
  * In case of a 'One for All' compression, all variables are defined on the same mesh and will be compressed simultaneously, e.g. the compression criterium must be fulfilled for each variable.
  * Therefore, the compresseion of the variables is dependent on one another (One mesh for all variables).
  * 
- * @note If 3D varibales will be compressed, but a 2D compression mode (e.g. ONE_FOR_ONE_2D) is chosen, the 3D varibale will be automatically spliited in their elevation coordinate and converted to several 2D 'longitude x latitude' variables
  * @note By default, an error threshold criterium is used (if no else has been set via a 'cmc_amr_pre_setup_...'-function).
  * @note Any 'cmc_amr_pre_setup_...' have to be called before \fn void cmc_amr_setup_compression(cmc_amr_data_t amr_data, CMC_AMR_COMPRESSION_MODE compression_mode)
  *
@@ -117,7 +145,7 @@ cmc_amr_setup_compression(cmc_amr_data_t amr_data, CMC_AMR_COMPRESSION_MODE comp
  * @param interpolation_function A function pointer describing which interpolation will be used in order to map the fine data on a coarser domain (@see @file cmc_t8_replace_callbacks.h for all opportunities)
  */
 void
-cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function = nullptr, const t8_forest_replace_t interpolation_function = nullptr);
+cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function = nullptr, cmc_t8_forest_interpolation_t interpolation_function = nullptr);
 #else
 /**
  * @brief This function performs the lossy AMR compression based on the data which was aquired by a call to one of the 'cmc_create_amr_compression_data...'-functions and the settings which have been previously set via \fn void cmc_amr_setup_compression(cmc_amr_data_t amr_data, CMC_AMR_COMPRESSION_MODE compression_mode)
@@ -129,7 +157,7 @@ cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function
  * @param interpolation_function A function pointer describing which interpolation will be used in order to map the fine data on a coarser domain (@see @file cmc_t8_replace_callbacks.h for all opportunities)
  */
 void
-cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function, const t8_forest_replace_t interpolation_function);
+cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function, cmc_t8_forest_interpolation_t interpolation_function);
 #endif
 
 /**

@@ -1,17 +1,15 @@
 #include "utilities/cmc_geo_util.h"
 #include "utilities/cmc_log_functions.h"
 
-////new try
-
 void
 cmc_var::switch_data()
 {
     if (data != nullptr)
     {
         delete data;
-        data = data_new;
-        data_new = nullptr;
     }
+    data = data_new;
+    data_new = nullptr;
 }
 
 void
@@ -279,4 +277,414 @@ cmc_value_equal_to_missing_value(const cmc_universal_type_t& value, const cmc_un
 {
     //TODO: not implemented yet
     return false;
+}
+
+bool
+cmc_value_equal_to_zero(const cmc_universal_type_t& value)
+{
+    /* Get the current type of the universal_type */
+    switch (static_cast<cmc_type>(value.index()))
+    {
+        case CMC_INT32_T:
+            if(std::get<int32_t>(value) == static_cast<int32_t>(0))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_FLOAT:
+            if(std::get<float>(value) == static_cast<float>(0.0))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_DOUBLE:
+            if(std::get<double>(value) == static_cast<double>(0.0))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_INT16_T:
+            if(std::get<int16_t>(value) == static_cast<int16_t>(0))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_INT64_T:
+            if(std::get<int64_t>(value) == static_cast<int64_t>(0))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_UINT64_T:
+            if(std::get<uint64_t>(value) == static_cast<uint64_t>(0))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_UINT32_T:
+            if(std::get<uint32_t>(value) == static_cast<uint32_t>(0))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_INT8_T:
+            if(std::get<int8_t>(value) == static_cast<int8_t>(0))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_UINT8_T:
+            if(std::get<uint8_t>(value) == static_cast<uint8_t>(0))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_UINT16_T:
+            if(std::get<uint16_t>(value) == static_cast<uint16_t>(0))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_BYTE:
+            if(std::get<std::byte>(value) == static_cast<std::byte>(0))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_CHAR:
+            if(std::get<char>(value) == static_cast<char>(0))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+    }
+}
+
+/**
+ * @brief Calculate an upper bound for a coarsening step. This functions estimates the deviation from the potential next coarsening @var current_mean 
+ *        to the initial data given the parameters below. 
+ * 
+ * @param previous_max_deviation The previous maximum deviation from the former coarsening step
+ * @param previous_value The value of one of the elements whose value will be (eventually) repalced by the next coarsening by the value @var current_mean 
+ * @param new_value The calculated value which will replace @var previous_mean and it's siblings' values
+ * @return double The estimate of the relative deviation 
+ */
+double
+calculate_two_step_relative_max_deviation(const double previous_max_deviation, const cmc_universal_type_t& previous_value, const cmc_universal_type_t& new_value)
+{
+    cmc_assert(previous_value.index() == new_value.index());
+    cmc_assert(previous_max_deviation >= 0.0);
+
+    /* Convert the new value, which is ought be a replacement for the previous element value, to double */
+    const double dnew_value = std::visit([](auto& val) -> double {return static_cast<double>(val);}, new_value);
+
+    /* Convert the previous element value to double */
+    double dprevious_value = std::abs(std::visit([](auto& val) -> double {return static_cast<double>(val);}, previous_value));
+
+    /* Adjust the previous value (in the range of all possible values) such that the new deviation will be maximized */
+    dprevious_value *= (dnew_value >= dprevious_value ? (1.0 - previous_max_deviation) : (1.0 + previous_max_deviation));
+
+    /* Check if the new_value is unequal to zero */
+    if (!cmc_approx_cmp(dprevious_value, static_cast<double>(0.0)))
+    {
+        /* If so, return the upper bound for the deviation this replacement would introduce */
+        return std::abs(1.0 - dnew_value / dprevious_value);
+    } else
+    {
+        /* Check if the previous value is zero */
+        if (cmc_approx_cmp(dnew_value, static_cast<double>(0.0)))
+        {
+            /* If so, there is no deviation */
+            return static_cast<double>(0.0);
+        } else
+        {
+            /* If the new value is unequal to zero, we use a measure of relative difference */
+            return static_cast<double>(2.0);
+        }
+    }
+}
+
+double
+calculate_two_step_absolute_max_deviation(const double previous_max_deviation, const cmc_universal_type_t& previous_value, const cmc_universal_type_t& new_value)
+{
+    cmc_assert(previous_value.index() == new_value.index());
+    cmc_assert(previous_max_deviation >= 0.0);
+
+    /* Convert the new value, which is ought be a replacement for the previous element value, to double */
+    const double dnew_value = std::visit([](auto& val) -> double {return static_cast<double>(val);}, new_value);
+
+    /* Convert the previous element value to double */
+    double dprevious_value = std::visit([](auto& val) -> double {return static_cast<double>(val);}, previous_value);
+
+    return std::abs(dnew_value - dprevious_value) + previous_max_deviation;
+}
+
+CMC_COORD_IDS
+cmc_get_split_dim_id(const DATA_LAYOUT initial_layout, const DATA_LAYOUT preferred_layout)
+{
+    cmc_assert(initial_layout > preferred_layout);
+    
+    switch(static_cast<int>(DATA_LAYOUT::_INTERN_ID_END_2D_START_3D) - static_cast<int>(preferred_layout))
+    {
+        case 1:
+            [[fallthrough]];
+        case 2:
+            return CMC_COORD_IDS::CMC_LAT;
+        break;
+        case 3:
+            [[fallthrough]];
+        case 4:
+            return CMC_COORD_IDS::CMC_LON;
+        break;
+        case 5:
+            [[fallthrough]];
+        case 6:
+            return CMC_COORD_IDS::CMC_LEV;
+        break;
+        default:
+            cmc_err_msg("The split dimension spuld not be determined.");
+            return CMC_LAT; //This return value has to be set only because there is no error value at the moment
+    }
+}
+
+/**
+ * @brief This functions returns the axis ordering given a certain @var layout
+ * 
+ * @param layout The DATA_LAYOUT which should be transformed to a vector
+ * @return std::vector<int> A vector containing the @enum's CMC_COORD_IDS ordered as given by the @var layout
+ */
+std::vector<int>
+cmc_get_axis_ordering_from_layout(const DATA_LAYOUT layout)
+{
+    switch(layout)
+    {
+        case DATA_LAYOUT::CMC_2D_LAT_LON:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LAT), static_cast<int>(CMC_COORD_IDS::CMC_LON)};
+        break;
+        case DATA_LAYOUT::CMC_2D_LON_LAT:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LON), static_cast<int>(CMC_COORD_IDS::CMC_LAT)};
+        break;
+        case DATA_LAYOUT::CMC_2D_LAT_LEV:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LAT), static_cast<int>(CMC_COORD_IDS::CMC_LEV)};
+        break;
+        case DATA_LAYOUT::CMC_2D_LEV_LAT:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LEV), static_cast<int>(CMC_COORD_IDS::CMC_LAT)};
+        break;
+        case DATA_LAYOUT::CMC_2D_LON_LEV:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LON), static_cast<int>(CMC_COORD_IDS::CMC_LEV)};
+        break;
+        case DATA_LAYOUT::CMC_2D_LEV_LON:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LEV), static_cast<int>(CMC_COORD_IDS::CMC_LON)};
+        break;
+        case DATA_LAYOUT::CMC_3D_LAT_LON_LEV:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LAT), static_cast<int>(CMC_COORD_IDS::CMC_LON), static_cast<int>(CMC_COORD_IDS::CMC_LEV)};
+        break;
+        case DATA_LAYOUT::CMC_3D_LAT_LEV_LON:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LAT), static_cast<int>(CMC_COORD_IDS::CMC_LEV), static_cast<int>(CMC_COORD_IDS::CMC_LON)};
+        break;
+        case DATA_LAYOUT::CMC_3D_LEV_LAT_LON:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LEV), static_cast<int>(CMC_COORD_IDS::CMC_LAT), static_cast<int>(CMC_COORD_IDS::CMC_LON)};
+        break;
+        case DATA_LAYOUT::CMC_3D_LEV_LON_LAT:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LEV), static_cast<int>(CMC_COORD_IDS::CMC_LON), static_cast<int>(CMC_COORD_IDS::CMC_LAT)};
+        break;
+        case DATA_LAYOUT::CMC_3D_LON_LEV_LAT:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LON), static_cast<int>(CMC_COORD_IDS::CMC_LEV), static_cast<int>(CMC_COORD_IDS::CMC_LAT)};
+        break;
+        case DATA_LAYOUT::CMC_3D_LON_LAT_LEV:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LAT), static_cast<int>(CMC_COORD_IDS::CMC_LON), static_cast<int>(CMC_COORD_IDS::CMC_LEV)};
+        break;
+        default:
+            cmc_err_msg("An unknown data layout has been supplied.");
+            return std::vector<int>{static_cast<int>(CMC_ERR)};
+    }
+}
+
+inline
+uint64_t
+cmc_coordinate::cmc_get_cart_coord_by_id(const cmc_coordinate_id _id) const
+{
+    switch(_id)
+    {
+        case cmc_coordinate_id::_CMC_LON:
+            return std::get<0>(cartesian_coordinate);
+        break;
+        case cmc_coordinate_id::_CMC_LAT:
+            return std::get<1>(cartesian_coordinate);
+        break;
+        case cmc_coordinate_id::_CMC_LEV:
+            return std::get<2>(cartesian_coordinate);
+        break;
+        default:
+            cmc_err_msg("Unknown coordinate ID.");
+            return 0;
+    }
+}
+
+inline
+uint64_t
+cmc_coordinate::cmc_get_ref_coord(const cmc_coordinate_id _coord_id) const
+{
+    switch(repr)
+    {
+        case current_representation::_CMC_CART_COORD:
+            return cmc_get_cart_coord_by_id(_coord_id);
+        break;
+        case current_representation::_CMC_MORTON_IDX:
+            cmc_err_msg("not yet implemented");
+            return 0;
+        break;
+        default:
+            cmc_err_msg("Cannot obtain a reference coordinate from the current representation.");
+    }
+}
+
+uint64_t
+cmc_coordinate::get_longitude_ref_coordinate() const
+{
+    return cmc_get_ref_coord(cmc_coordinate_id::_CMC_LON);
+}
+
+uint64_t
+cmc_coordinate::get_latitude_ref_coordinate() const
+{
+    return cmc_get_ref_coord(cmc_coordinate_id::_CMC_LAT);
+}
+
+uint64_t
+cmc_coordinate::get_elevation_ref_coordinate() const
+{
+    return cmc_get_ref_coord(cmc_coordinate_id::_CMC_LEV);
+}
+
+void
+cmc_ref_coordinates::ref()
+{
+    /* Increment the reference count */
+    ++reference_count;
+}
+
+void
+cmc_ref_coordinates::unref()
+{
+    /* Decrement the reference count */
+    if(--reference_count < 0)
+    {
+        //Nothing to be deallocated by now
+    }
+}
+
+cmc_universal_type_t
+cmc_global_coordinate_system::get_coordinate_value_at_dim(const CMC_COORD_IDS coord_id, const size_t reference_position)
+{
+
+    cmc_universal_type_t ret_val{static_cast<int>(0)};
+
+    switch (coord_id)
+    {
+        case CMC_COORD_IDS::CMC_LON:
+            cmc_assert(reference_position < ((coords.operator[](static_cast<size_t>(CMC_COORD_IDS::CMC_LON))).size()));
+            ret_val = (coords.operator[](static_cast<size_t>(CMC_COORD_IDS::CMC_LON))).operator[](reference_position);
+        break;
+        case CMC_COORD_IDS::CMC_LAT:
+            cmc_assert(reference_position < (coords.operator[](static_cast<size_t>(CMC_COORD_IDS::CMC_LAT)).size()));
+            ret_val = (coords.operator[](static_cast<size_t>(CMC_COORD_IDS::CMC_LAT))).operator[](reference_position);
+        break;
+        case CMC_COORD_IDS::CMC_LEV:
+            cmc_assert(reference_position < (coords.operator[](static_cast<size_t>(CMC_COORD_IDS::CMC_LEV)).size()));
+            ret_val = (coords.operator[](static_cast<size_t>(CMC_COORD_IDS::CMC_LEV))).operator[](reference_position);
+        break;
+        case CMC_COORD_IDS::CMC_TIME:
+            cmc_err_msg("Currently, time series data is not supported.");
+        break;
+        default:
+            cmc_err_msg("An unknown coordinate dimension was supplied.");
+    }
+
+    return ret_val;
+}
+
+cmc_universal_type_t
+cmc_global_coordinate_system::get_coordinate_value_at_longitude(const size_t reference_position)
+{
+    /* Return the longitude value at the reference position */
+    return get_coordinate_value_at_dim(CMC_COORD_IDS::CMC_LON, reference_position);
+}
+
+cmc_universal_type_t
+cmc_global_coordinate_system::get_coordinate_value_at_latitude(const size_t reference_position)
+{
+    /* Return the latitude value at the reference position */
+    return get_coordinate_value_at_dim(CMC_COORD_IDS::CMC_LAT, reference_position);
+}
+
+cmc_universal_type_t
+cmc_global_coordinate_system::get_coordinate_value_at_elevation(const size_t reference_position)
+{
+    /* Return the elevation value at the reference position */
+    return get_coordinate_value_at_dim(CMC_COORD_IDS::CMC_LEV, reference_position);
+}
+
+void
+cmc_global_coordinate_system::ref()
+{
+    /* Increase the reference count */
+    ++(reference_count);
+}
+
+void
+cmc_global_coordinate_system::unref()
+{
+    /* Decrease the reference count */
+    if((--reference_count) < 0)
+    {
+        /* Deallocate all global coordinate data */
+        //delete coords;
+        //coords = nullptr;
+    }
+}
+
+void
+cmc_global_coordinate_system::reset_reference_count()
+{
+    /* Reset the reference count to zero */
+    reference_count = 0;
 }

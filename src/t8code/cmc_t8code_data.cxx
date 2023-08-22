@@ -46,10 +46,10 @@ cmc_t8_var::get_data_layout() const
 }
 
 size_t
-cmc_t8_geo_data::get_coord_length(const CMC_COORD_IDS cmc_coord_id) const
+cmc_t8_geo_data::get_global_coord_length(const CMC_COORD_IDS cmc_coord_id) const
 {
-    cmc_assert(coords->size() >= CMC_NUM_COORD_IDS);
-    return (coords->operator[](cmc_coord_id)).size();
+    cmc_assert(global_dim_lengths.size() >= CMC_NUM_COORD_IDS);
+    return global_dim_lengths[cmc_coord_id];
 }
 
 /* Write the forest as well as the variables in a vtk-file (depending on the compression mode (if supplied) one file with all variables or one file per variable is written) */
@@ -100,8 +100,7 @@ cmc_t8_write_forest_all_vars(cmc_t8_data_t t8_data, const char* file_prefix)
     else
     {
         /* If all variables are defined on the same forest with an 'One For All'-compression mode */
-        if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-            t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+        if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
         {
             /* Get the amount of variables to write out */
             const size_t num_data_vars{var_ids_zcurve.size()};
