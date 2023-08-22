@@ -708,14 +708,28 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
 
 void
 cmc_amr_decompress(cmc_amr_data_t amr_data)
-{
+{   
     #ifdef CMC_WITH_T8CODE
+
     cmc_assert(amr_data->compression_applied);
 
     cmc_debug_msg("Decompression of data starts...");
 
-    /* Refine the data of all variables to corresponding intial mesh */
+    /* Get the current time point before the iterative decompression */
+    auto start_time_iterative = std::chrono::high_resolution_clock::now();
+    #if 0
     cmc_t8_refine_to_initial_level(amr_data->t8_data);
+    #else
+    cmc_t8_refine_to_initial_level_by_search(amr_data->t8_data);
+    #endif
+    
+    /* Get the time point after the iterative decompression */
+    auto end_time_iterative = std::chrono::high_resolution_clock::now();
+
+    /* Calculate the duration of the iterative decompression */
+    auto duration_iterative = std::chrono::duration_cast<std::chrono::milliseconds>(end_time_iterative - start_time_iterative);
+
+    cmc_debug_msg("The duration of the decompression took: ", duration_iterative.count(), "ms"); //Eventually change milliseconds to milliseconds or something else
 
     cmc_debug_msg("Decompression has been finished.");
     

@@ -3541,76 +3541,6 @@ static int t8_search_query_callback (t8_forest_t forest, t8_locidx_t ltreeid, co
 
 }
 
-/* Create a struct that can hold the informations that we need for our search. */
-struct my_element {
-    /*Coordinate Variable for each element in the uniform forest for the search callback. */
-    std::array<double, 3> midpoint{0.0, 0.0, 0.0}; 
-    /*Contains the element ID in the coarse forest in which the element is found. */
-    t8_locidx_t corresponding_coarse_element_id; 
-};
-
-/* Create a struct that can hold the informations that we need for our search. */
-struct element_to_search_for {
-    /* Pointer for each element in the uniform forest for the search callback. */
-    t8_element_t *elem; 
-    /*Contains the element ID in the coarse forest in which the element is found. */
-    t8_locidx_t corresponding_coarse_element_id; 
-};
-
-
-/* Create a search callback that will be called once per element and decides whether or not 
-*to continue the search with the children of the element.*/
-static int t8_search_callback (t8_forest_t forest, t8_locidx_t ltreeid, const t8_element_t *element, const int is_leaf, 
-                                t8_element_array_t *leaf_elements, t8_locidx_t tree_leaf_index, void *query, size_t query_index)
-{
-    T8_ASSERT (query == NULL);          
-    
-    return 1;
-}
-
-/*___________neue Version______________*/
-#if 1
-
-/* Create a query callback that will be called for each element once per active query. 
-* It decides wheter or not the query remains active for the children of the element.  */
-static int t8_search_query_callback (t8_forest_t forest, t8_locidx_t ltreeid, const t8_element_t *element, const int is_leaf,
-                                    t8_element_array_t *leaf_elements, t8_locidx_t tree_leaf_index, void *query, size_t query_index)
-{
-    int morton_index_is_inside;
-
-    T8_ASSERT (query != NULL);
-
-    /* Cast the query pointer to an element pointer. */
-    element_to_search_for *particle = (element_to_search_for *) query;
-
-    /*Numerical tolerance for the is_inside_element check. */
-    //const double tolerance = 1e-8;
-
-    /*Test wheter the Morton index of the fine element is contained in the current element.*/
-    morton_index_is_inside = (t8_element_get_linear_id(t8_forest_get_eclass_scheme (forest, t8_forest_get_eclass(forest, 0)), element, t8_element_level(t8_forest_get_eclass_scheme (forest, t8_forest_get_eclass(forest, 0)), element)) == 
-                                t8_element_get_linear_id(t8_forest_get_eclass_scheme (forest, t8_forest_get_eclass(forest, 0)), particle->elem, t8_element_level(t8_forest_get_eclass_scheme (forest, t8_forest_get_eclass(forest, 0)), element))) ? 1 : 0;
-
-
-    if (morton_index_is_inside) {
-        if (is_leaf) {
-            /* The particle morton index is inside the element morton index and is a leaf element. 
-            * We mark the particle for being inside the partition. */
-            /* In order to find the index of the element inside the array, we compute the 
-            * index of the element within the tree. */
-
-            particle->corresponding_coarse_element_id = tree_leaf_index;
-            
-        }
-        /* The particle is inside the element. The query should remain active.
-        * If this element is not a leaf the search will continue with its children. */
-        return 1;
-    }
-    /*The particle is not inside the element. Deactivate the query. 
-    * If no active queries are left, the search will stop for this element and its children. */
-    return 0;
-
-}
-
 void
 cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
 {
@@ -3830,7 +3760,7 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
     #endif
 }
 #endif
-/*____________Ende neue Verion____________*/
+/*____________Ende neue Version____________*/
 
 /*______________alte Version_______________*/
 #if 0
@@ -4101,7 +4031,6 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
 }
 #endif
 /*______________Ende alte Version_______________*/
-void
 
 void
 cmc_t8_geo_data_set_relative_error_criterium(cmc_t8_data_t t8_data, const double maximum_error_tolerance)
