@@ -21,15 +21,15 @@ main(int argc, char* argv[])
   
   #if 1
     //New test for parallel netCDF input
-    cmc_nc_data_t nc_data = cmc_nc_start("../../data/test_nc4_file.nc", cmc_nc_opening_mode::CMC_NC_PARALLEL, MPI_COMM_WORLD);
+    cmc_nc_data_t nc_data = cmc_nc_start("../../data/example_messy_data_par.nc", cmc_nc_opening_mode::CMC_NC_PARALLEL, MPI_COMM_WORLD);
     
     const size_t start_ptr[3] = {0,0,0};  //Example netCDF File
-    const size_t count_ptr[3] = {1,73,144}; //Example netCDF File
+    const size_t count_ptr[3] = {1,64,128}; //Example netCDF File
     
-    std::vector<int> p_dist{1,2,1};
-    cmc_nc_set_blocked_reading(nc_data, p_dist);
+    //std::vector<int> p_dist{1,2,1};
+    //cmc_nc_set_blocked_reading(nc_data, p_dist);
     
-    cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "p2t", "tco3");
+    cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "O3");
     
     
     //cmc_nc_data_t nc_data = cmc_nc_start("../../data/MESSy_DATA/MESSy2/raw/tracer/RC1-base-07_0028_restart_0001_tracer_gp.nc", cmc_nc_opening_mode::CMC_NC_PARALLEL);
@@ -94,7 +94,7 @@ main(int argc, char* argv[])
 
     /* Close the netCDF file */
     cmc_nc_close(ncid);
-
+#endif
 #if 0
     /* Define data classes holding the variable data and forests as well as additional information during the compression process */
     cmc_amr_data_t amr_data;
@@ -135,7 +135,7 @@ main(int argc, char* argv[])
     cmc_amr_write_vtk_file(amr_data, "compressed_data");
 
     /* Decompress the data */
-    cmc_amr_decompress(amr_data);
+    cmc_amr_decompress(amr_data, MPI_COMM_WORLD);
 
   	/* Write a vtk file of the decompressed data */
     cmc_amr_write_vtk_file(amr_data, "decompressed_data");

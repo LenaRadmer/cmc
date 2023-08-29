@@ -17,12 +17,13 @@
 #include <t8_forest/t8_forest.h>
 #include <t8_schemes/t8_default/t8_default_cxx.hxx>
 #include <t8_schemes/t8_default/t8_default_common/t8_default_common_cxx.hxx>
-#include <t8_forest.h>
+#include <t8_forest/t8_forest.h>
 #include <t8_schemes/t8_default/t8_default_c_interface.h>
 #include <t8_element_c_interface.h>
 #include <t8_forest/t8_forest_iterate.h>
 #include <t8_forest/t8_forest_vtk.h>
 #include <t8_forest/t8_forest_partition.h>
+
 #include <p4est.h>
 #include <p8est.h>
 #endif

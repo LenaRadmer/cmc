@@ -2,9 +2,14 @@
 #include "cmc_t8code_data.hxx"
 #include "cmc_t8code_geo_mesh.h"
 #include "cmc_t8_adapt_callbacks.h"
+#include "cmc_t8_adapt_callbacks.cxx"
 #include "cmc_t8_replace_callbacks.h"
 #include "utilities/cmc_log_functions.h"
 #include "utilities/cmc_container.h"
+
+
+#include <t8.h>
+
 
 /** Begin STATIC Functions **/
 /****************************/
@@ -3485,7 +3490,41 @@ struct element_to_search_for {
     t8_element_t *elem; 
     /*Contains the element ID in the coarse forest in which the element is found. */
     t8_locidx_t corresponding_coarse_element_id; 
+    t8_locidx_t global_element_id_in_uniform_forest;
 };
+
+t8_locidx_t
+cmc_t8_adapt_callback_refine_to_initial_lvl_by_search (t8_forest_t forest,
+                                             t8_forest_t forest_from,
+                                             int which_tree,
+                                             int lelement_id,
+                                             t8_eclass_scheme_c * ts,
+                                             const int is_family,
+                                             const int num_elements,
+                                             t8_element_t * elements[]) 
+{
+    #ifdef CMC_WITH_T8CODE
+    cmc_t8_adapt_data_t adapt_data = static_cast<cmc_t8_adapt_data_t>(t8_forest_get_user_data(forest));
+    //adapt_data->adapt_step = 0;
+    if (!cmc_t8_elements_all_inside_geo_mesh(adapt_data, ts, 1, elements))
+    {
+        /* The element is not inside the geo mesh, therefore we cannot refine it */
+        return 0;
+
+    } 
+    /* Check if the element is already on the initial refinement level (or if it is still coarser) */
+    if(cmc_t8_element_level_coarser_than_initial_refinement_level(adapt_data, ts, elements[0]))
+    {
+        /* If the element's level is still coarser than the initial refinement level, we can refine the element */
+        return 1;
+    } else
+    {
+        /* If we have already reached the initial refinement level, the element stays the same */
+        return 0;
+    }
+
+    #endif
+}
 
 
 /* Create a search callback that will be called once per element and decides whether or not 
@@ -3500,7 +3539,6 @@ static int t8_search_callback (t8_forest_t forest, t8_locidx_t ltreeid, const t8
 
 /*___________neue Version______________*/
 #if 1
-
 /* Create a query callback that will be called for each element once per active query. 
 * It decides wheter or not the query remains active for the children of the element.  */
 static int t8_search_query_callback (t8_forest_t forest, t8_locidx_t ltreeid, const t8_element_t *element, const int is_leaf,
@@ -3515,7 +3553,7 @@ static int t8_search_query_callback (t8_forest_t forest, t8_locidx_t ltreeid, co
 
     /*Numerical tolerance for the is_inside_element check. */
     //const double tolerance = 1e-8;
-
+    //t8_forest_t ghost_forest =  t8_forest_ghost_create (forest);
     /*Test wheter the Morton index of the fine element is contained in the current element.*/
     morton_index_is_inside = (t8_element_get_linear_id(t8_forest_get_eclass_scheme (forest, t8_forest_get_eclass(forest, 0)), element, t8_element_level(t8_forest_get_eclass_scheme (forest, t8_forest_get_eclass(forest, 0)), element)) == 
                                 t8_element_get_linear_id(t8_forest_get_eclass_scheme (forest, t8_forest_get_eclass(forest, 0)), particle->elem, t8_element_level(t8_forest_get_eclass_scheme (forest, t8_forest_get_eclass(forest, 0)), element))) ? 1 : 0;
@@ -3527,7 +3565,7 @@ static int t8_search_query_callback (t8_forest_t forest, t8_locidx_t ltreeid, co
             * We mark the particle for being inside the partition. */
             /* In order to find the index of the element inside the array, we compute the 
             * index of the element within the tree. */
-
+            //cmc_debug_msg("Tree leaf index is: ", t8_forest_get_tree_element_offset (forest, ltreeid)+ tree_leaf_index);
             particle->corresponding_coarse_element_id = tree_leaf_index;
             
         }
@@ -3544,39 +3582,68 @@ static int t8_search_query_callback (t8_forest_t forest, t8_locidx_t ltreeid, co
 void
 cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
 {
+
     #ifdef CMC_WITH_T8CODE
 
     /* General variable which can hold a forest. */
     t8_forest_t forest;
 
+    t8_gloidx_t num_elems_former_forest{0};
+
+    t8_forest_t forest_initial_level;
+    t8_forest_t adapted_forest;
+
+    cmc_t8_adapt_data adapt_data{t8_data};
+
     /* In case of the One_for_All mode. */
-    if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-        t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+    if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
     {
-        /* Set the coarse forest */
-        forest = t8_data->assets->forest;
-        /* Set the initial refinement level */
-        const int initial_refinement_lvl = t8_data->assets->initial_refinement_lvl;
-        cmc_debug_msg("Initial ref level of forest is: ", t8_data->assets->initial_refinement_lvl);
 
         /* Create a cmesh (based only on one quadrilateral or one hexahedron). */
         t8_cmesh_t cmesh;
 
         /*Define the cmesh based on the dimension of the coarse forest. */
-        if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D) {
+        if (t8_data->dimension_of_compression_mode == 2) {
             cmesh = t8_cmesh_new_hypercube(T8_ECLASS_QUAD, MPI_COMM_WORLD, 0, 0, 1);
         }
         else {
             cmesh = t8_cmesh_new_hypercube(T8_ECLASS_HEX, MPI_COMM_WORLD, 0, 0, 1);
         }
-
+        const int initial_refinement_lvl = t8_data->assets->initial_refinement_lvl;
         /* Declare a new forest which is uniform and on the initial refinement level. */
-        t8_forest_t forest_initial_level = t8_forest_new_uniform(cmesh, t8_scheme_new_default_cxx(), 
+        t8_forest_t forest_initial = t8_forest_new_uniform(cmesh, t8_scheme_new_default_cxx(), 
                                                                     initial_refinement_lvl, 0, MPI_COMM_WORLD);
 
         /* Coarsen the elements of the forest mesh which are not part of the simlulation geo-grid. */
-        forest_initial_level = cmc_t8_coarsen_geo_mesh(*t8_data, forest_initial_level, initial_refinement_lvl);
-            
+        forest_initial = cmc_t8_coarsen_geo_mesh(*t8_data, forest_initial, initial_refinement_lvl);
+        /* Set the coarse forest */
+        forest = t8_data->assets->forest;        
+        t8_forest_ref(forest);
+        forest_initial_level = forest;
+        num_elems_former_forest = t8_forest_get_global_num_elements(forest_initial);
+         cmc_debug_msg(" globale elemente in forest_initial_level: ", t8_forest_get_global_num_elements(forest_initial_level));
+         /* Apply the adaptation/coarsening as often as possible */
+            while (num_elems_former_forest > t8_forest_get_global_num_elements(forest_initial_level))
+            {
+                /* Keep the 'forest' after the adaptation step */
+                t8_forest_ref(forest_initial_level);
+
+                /* Create the adapted forest */
+                adapted_forest = t8_forest_new_adapt(forest_initial_level, cmc_t8_adapt_callback_refine_to_initial_lvl_by_search, 0, 0, static_cast<void*>(&adapt_data));
+
+                /* Free the former forest */
+                t8_forest_unref(&forest_initial_level);
+
+                /* Switch to coarsened forest */
+                forest_initial_level = adapted_forest;
+            }
+        /* Set the initial refinement level */
+        cmc_debug_msg(" globale elemente in forest_initial_level: ", t8_forest_get_global_num_elements(forest_initial_level));
+        cmc_debug_msg(" lokale elemente in forest_initial_level: ", t8_forest_get_local_num_elements(forest_initial_level));
+        cmc_debug_msg(" lokale elemente in forest: ", t8_forest_get_global_num_elements(forest));
+        cmc_debug_msg("Initial ref level of forest is: ", t8_data->assets->initial_refinement_lvl);
+        t8_forest_unref(&forest_initial);
+    
         
         /*Create an array for all elements of the new uniform forest. */
         sc_array_t *list_of_elements_to_search_for;
@@ -3590,14 +3657,14 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
             element_to_search_for* current_element_to_search_for = (element_to_search_for *) sc_array_index_int (list_of_elements_to_search_for, element_id);
             /*Save the pointer of the element in our struct.*/
             current_element_to_search_for->elem = t8_forest_get_element_in_tree (forest_initial_level, 0, element_id);
-
+            //cmc_debug_msg(element_id, "Element id in tree is: ", element_id+rank_id*(t8_forest_get_global_num_elements(forest_initial_level) - t8_forest_get_local_num_elements(forest_initial_level)) );
         }
         
         /* Perform the search of the forest. The second argument is the search callback function,
         * then the query callback function and the last argument is the array of queries. */
         t8_forest_search (forest, t8_search_callback,
                             t8_search_query_callback, list_of_elements_to_search_for);
-
+        
         /*Iterate over each variable and map the values on the new uniform forest. */      
         for (size_t var_id = 0; var_id < t8_data->vars.size(); ++var_id) {
 
@@ -3609,7 +3676,7 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
                 /*Get the element, which contains the element of the uniform forest, from the coarse forest 
                 * and copy the data according to that. */
                 size_t current_element = static_cast<size_t>(((element_to_search_for *) t8_sc_array_index_locidx (list_of_elements_to_search_for, i))->corresponding_coarse_element_id);
-
+                //cmc_debug_msg(current_element);
                 cmc_universal_type_t old_data_value = t8_data->vars[var_id]->var->data->operator[](current_element);
                 /* Copy the old value into data_new. */
                 t8_data->vars[var_id]->var->data_new->assign(i, old_data_value);
@@ -3618,8 +3685,8 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
             /* Replace the old data with the new data and delete them. */
             t8_data->vars[var_id]->var->switch_data();
         }
-
-        #if 0
+        
+        #if 1
 
         /* Create a vtk data field to hold the vtk data for every variable. */
         t8_vtk_data_field_t* enhanced_decompression_data_array = (t8_vtk_data_field_t*) malloc(sizeof(t8_vtk_data_field_t) * t8_data->vars.size());
@@ -3633,7 +3700,7 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
             enhanced_decompression_data_array[i].data = var_data.back().data();
             enhanced_decompression_data_array[i].type = T8_VTK_SCALAR;
         }
-
+        
         t8_forest_write_vtk_ext (forest_initial_level, "Enhanced_decompressed_forest", 1, 1, 1, 1, 0, 0, 0, t8_data->vars.size(), enhanced_decompression_data_array);
         free(enhanced_decompression_data_array);
 
@@ -3646,19 +3713,16 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
 
     }
     /* In case of the One_For_One mode. */
-    else if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_2D ||
-             t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_3D)
+    else if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE)
     {
          /* Set the initial refinement level */
         int initial_refinement_lvl = t8_data->vars[0]->assets->initial_refinement_lvl;
-
-        cmc_debug_msg("initial ref level: ", initial_refinement_lvl);
 
         /* Create a cmesh (based only on one quadrilateral or one hexahedron). */
         t8_cmesh_t cmesh;
 
         /*Define the cmesh based on the dimension of the coarse forest. */
-        if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_2D) {
+        if (t8_data->dimension_of_compression_mode == 2) {
             cmesh = t8_cmesh_new_hypercube(T8_ECLASS_QUAD, MPI_COMM_WORLD, 0, 0, 1);
         }
         else {
@@ -3666,63 +3730,97 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
         }
 
         /* Declare a new forest which is uniform and on the initial refinement level. */
-        t8_forest_t forest_initial_level = t8_forest_new_uniform(cmesh, t8_scheme_new_default_cxx(), 
+        t8_forest_t forest_initial = t8_forest_new_uniform(cmesh, t8_scheme_new_default_cxx(), 
                                                                     initial_refinement_lvl, 0, MPI_COMM_WORLD);
     
         /* Coarsen the elements of the forest mesh which are not part of the simlulation geo-grid. */
-        forest_initial_level = cmc_t8_coarsen_geo_mesh(*t8_data, forest_initial_level, initial_refinement_lvl);
+        forest_initial = cmc_t8_coarsen_geo_mesh(*t8_data, forest_initial, initial_refinement_lvl);
 
+        /* Since every variable define its own mesh, we iterate over all variables */
+        for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
+        {
+            cmc_debug_msg("var_id is: ", var_id);
+            adapt_data.current_var_id = var_id;
+            /* Get the coarse/compressed forest for the current variable */
+            forest = t8_data->vars[var_id]->assets->forest;
+            
+            t8_forest_ref(forest);
+            forest_initial_level = forest;
+            num_elems_former_forest = t8_forest_get_global_num_elements(forest_initial);
+            cmc_debug_msg(" globale elemente in forest_initial_level: ", t8_forest_get_global_num_elements(forest_initial_level));
+            cmc_debug_msg(" globale elemente in forest_initial: ", t8_forest_get_global_num_elements(forest_initial));
+            /* Apply the adaptation/coarsening as often as possible */
+            while (num_elems_former_forest > t8_forest_get_global_num_elements(forest_initial_level))
+                {
+                   
+                /* Keep the 'forest' after the adaptation step */
+                t8_forest_ref(forest_initial_level);
+                /* Create the adapted forest */
+                adapted_forest = t8_forest_new_adapt(forest_initial_level, cmc_t8_adapt_callback_refine_to_initial_lvl_by_search, 0, 0, static_cast<void*>(& adapt_data));
+                /* Free the former forest */
+                t8_forest_unref(&forest_initial_level);
+                /* Switch to coarsened forest */
+                forest_initial_level = adapted_forest;
+            }
+        /* Set the initial refinement level */
+        cmc_debug_msg(" globale elemente in forest_initial_level: ", t8_forest_get_global_num_elements(forest_initial_level));
+        cmc_debug_msg(" lokale elemente in forest_initial_level: ", t8_forest_get_local_num_elements(forest_initial_level));
+        cmc_debug_msg(" lokale elemente in forest: ", t8_forest_get_global_num_elements(forest));
+        
+       
         /*Create an array for all elements of the new uniform forest. */
         sc_array_t *list_of_elements_to_search_for;
 
         list_of_elements_to_search_for = sc_array_new_count (sizeof (element_to_search_for), t8_forest_get_local_num_elements(forest_initial_level));
 
+        cmc_debug_msg("Local Elements: ", t8_forest_get_local_num_elements(forest_initial_level));
         /* Fill the array with the coordinates of each element. */
         for (t8_locidx_t element_id = 0; element_id < t8_forest_get_local_num_elements(forest_initial_level); element_id++) 
         {
+            //cmc_debug_msg("Element id is: ", element_id );
             /* Get this particle's pointer. */
-            element_to_search_for*  current_element_to_search_for = (element_to_search_for *) sc_array_index_int (list_of_elements_to_search_for, element_id);
-
+            element_to_search_for*  current_element_to_search_for = (element_to_search_for *) sc_array_index_int(list_of_elements_to_search_for, element_id);
+            //cmc_debug_msg("Element id in tree is: ", element_id+rank_id*t8_forest_get_local_num_elements(forest_initial_level) );
             current_element_to_search_for->elem= t8_forest_get_element_in_tree (forest_initial_level, 0, element_id);
+            current_element_to_search_for->global_element_id_in_uniform_forest = t8_element_get_linear_id(t8_forest_get_eclass_scheme (forest_initial_level, t8_forest_get_eclass(forest_initial_level, 0)), current_element_to_search_for->elem, initial_refinement_lvl);
+            //cmc_debug_msg("Element id: ", 0+ element_id, " und element in tree: ", 0+ t8_element_get_linear_id(t8_forest_get_eclass_scheme (forest_initial_level, t8_forest_get_eclass(forest_initial_level, 0)), current_element_to_search_for->elem, initial_refinement_lvl));
+            //cmc_debug_msg("Element_id: ", element_id);
         }
-
-        /* Since every variable define its own mesh, we iterate over all variables */
-        for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
-        {
-
-            /* Get the coarse/compressed forest for the current variable */
-            forest = t8_data->vars[var_id]->assets->forest;
-
+            
             /* Perform the search of the forest for the current variable. The second argument is the search callback function,
             * then the query callback function and the last argument is the array of queries. 
             * After the search we have found the corresponding_coarse_element_id for all the elements in 
             * the initial forest that are inside the current variable element. */
             t8_forest_search (forest, t8_search_callback,
                                 t8_search_query_callback, list_of_elements_to_search_for);
-
+            cmc_debug_msg("Search worked");
             /* Allocate memory for data_new array. */
-            t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(forest_initial_level)), 
+            t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_global_num_elements(forest_initial_level)), 
                                                                     t8_data->vars[var_id]->get_type());
-
-            for (t8_gloidx_t i = 0; i < t8_forest_get_local_num_elements(forest_initial_level); ++i) {
-
+                                                                    
+            cmc_debug_msg("Allocate memory worked ");
+            cmc_debug_msg("Der komprimierte Forest hat:  ", t8_forest_get_global_num_elements(forest), " Elemente.");
+            cmc_debug_msg("Der komprimierte Forest hat lokal:  ", t8_forest_get_local_num_elements(forest), " Elemente.");
+            for (t8_locidx_t i = 0; i < t8_forest_get_local_num_elements(forest_initial_level); ++i) {
+                //Here is the problem!!!
                 /*Get the element, which contains the element of the uniform forest, from the coarse forest 
                 * and copy the data according to that. */
                 size_t current_element = static_cast<size_t>(((element_to_search_for *) t8_sc_array_index_locidx (list_of_elements_to_search_for, i))->corresponding_coarse_element_id);
-
+                //t8_locidx_t current_element_id_in_tree = static_cast<t8_locidx_t>(((element_to_search_for *) t8_sc_array_index_locidx (list_of_elements_to_search_for, i))->global_element_id_in_uniform_forest);
+               
                 cmc_universal_type_t old_data_value = t8_data->vars[var_id]->var->data->operator[](current_element);
-
+                //cmc_debug_msg("element_id: ", i, " und platz in neuem array: ", t8_forest_get_local_num_elements(forest_initial_level)*rank+i );
                 /* Copy the old value into data_new. */
                 t8_data->vars[var_id]->var->data_new->assign(i, old_data_value);
-
+                
             }
-
+            cmc_debug_msg("everything worked ");
             /* Replace the old data with the new data and delete them. */
             t8_data->vars[var_id]->var->switch_data();
-            
+            cmc_debug_msg("switch worked ");
             /* Deallocate the coarse forest */
             t8_forest_unref(&forest);
-
+            t8_forest_unref(&forest_initial);
             /* Save the decompressed forest */
             t8_data->vars[var_id]->assets->forest = forest_initial_level;
 
@@ -3731,8 +3829,9 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
             {
                 t8_forest_ref(t8_data->vars[var_id]->assets->forest);
             }
+            sc_array_destroy(list_of_elements_to_search_for);
         }
-        #if 0
+        #if 1
 
         /* Create a vtk data field to hold the vtk data for every variable. */
         t8_vtk_data_field_t* enhanced_decompression_data_array = (t8_vtk_data_field_t*) malloc(sizeof(t8_vtk_data_field_t) * t8_data->vars.size());
@@ -3752,8 +3851,6 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
         free(enhanced_decompression_data_array);
 
         #endif
-
-        sc_array_destroy(list_of_elements_to_search_for);
         t8_forest_unref(&forest_initial_level);
     }
 
@@ -3811,8 +3908,7 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
     t8_forest_t forest;
 
     /* In case of the One_for_All mode. */
-    if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-        t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+    if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
     {
         /* Set the coarse forest */
         forest = t8_data->assets->forest;
@@ -3824,7 +3920,7 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
         t8_cmesh_t cmesh;
 
         /*Define the cmesh based on the dimension of the coarse forest. */
-        if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D) {
+        if (t8_data->dimension_of_compression_mode == 2) {
             cmesh = t8_cmesh_new_hypercube(T8_ECLASS_QUAD, MPI_COMM_WORLD, 0, 0, 1);
         }
         else {
@@ -3911,8 +4007,7 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
 
     }
     /* In case of the One_For_One mode. */
-    else if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_2D ||
-             t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_3D)
+    else if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE)
     {
          /* Set the initial refinement level */
         int initial_refinement_lvl = t8_data->vars[0]->assets->initial_refinement_lvl;
@@ -3923,7 +4018,7 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
         t8_cmesh_t cmesh;
 
         /*Define the cmesh based on the dimension of the coarse forest. */
-        if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_2D) {
+        if (t8_data->dimension_of_compression_mode == 2) {
             cmesh = t8_cmesh_new_hypercube(T8_ECLASS_QUAD, MPI_COMM_WORLD, 0, 0, 1);
         }
         else {

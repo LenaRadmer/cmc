@@ -573,6 +573,7 @@ cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function
     //cmc_t8_write_forest_all_vars(amr_data->t8_data, file_prefix);
     #endif
     #endif
+    #endif
 }
 
 /**
