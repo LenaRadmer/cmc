@@ -715,23 +715,36 @@ cmc_amr_decompress(cmc_amr_data_t amr_data)
     cmc_assert(amr_data->compression_applied);
 
     cmc_debug_msg("Decompression of data starts...");
-
+    //Use MPI_Wtime :)
+    double start_time, end_time, duration, global_max_time;
+    int err;
     /* Get the current time point before the iterative decompression */
-    auto start_time_iterative = std::chrono::high_resolution_clock::now();
-    #if 0
+
+    //auto start_time_iterative = std::chrono::high_resolution_clock::now();
+
+    err = MPI_Barrier(amr_data->t8_data->comm);
+    cmc_mpi_check_err(err);
+    start_time = MPI_Wtime();
+    #if 1
     cmc_t8_refine_to_initial_level(amr_data->t8_data);
     #else
     cmc_t8_refine_to_initial_level_by_search(amr_data->t8_data);
     #endif
-    
+    err = MPI_Barrier(amr_data->t8_data->comm);
+    cmc_mpi_check_err(err);
+    end_time = MPI_Wtime();
+    duration = end_time - start_time;
+    err = MPI_Reduce(&duration, &global_max_time, 1, MPI_DOUBLE, MPI_MAX, 0, amr_data->t8_data->comm);
+    cmc_mpi_check_err(err);
+    cmc_global_msg("The duration of the decompression took: ", global_max_time, " sek");
     /* Get the time point after the iterative decompression */
-    auto end_time_iterative = std::chrono::high_resolution_clock::now();
+    //auto end_time_iterative = std::chrono::high_resolution_clock::now();
 
     /* Calculate the duration of the iterative decompression */
-    auto duration_iterative = std::chrono::duration_cast<std::chrono::milliseconds>(end_time_iterative - start_time_iterative);
+    /*auto duration_iterative = std::chrono::duration_cast<std::chrono::milliseconds>(end_time_iterative - start_time_iterative);
 
     cmc_debug_msg("The duration of the decompression took: ", duration_iterative.count(), "ms"); //Eventually change milliseconds to milliseconds or something else
-
+    */
     cmc_debug_msg("Decompression has been finished.");
     
     /* Set the (de-)comrpession flag */
