@@ -23,8 +23,8 @@ main(int argc, char* argv[])
     //New test for parallel netCDF input
     cmc_nc_data_t nc_data = cmc_nc_start("../../data/example_messy_data_par.nc", cmc_nc_opening_mode::CMC_NC_PARALLEL, MPI_COMM_WORLD);
     
-    const size_t start_ptr[3] = {0,0,0};  //Example netCDF File
-    const size_t count_ptr[3] = {90,64,128}; //Example netCDF File
+    const size_t start_ptr[3] = {82,0,0};  //Example netCDF File
+    const size_t count_ptr[3] = {1,64,128}; //Example netCDF File
     
     //std::vector<int> p_dist{1,2,1};
     //cmc_nc_set_blocked_reading(nc_data, p_dist);
@@ -53,17 +53,17 @@ main(int argc, char* argv[])
     /* Close the netCDF file and deallocate nc_data */
     cmc_nc_finish(nc_data);
 
-    cmc_amr_pre_setup_split_3D_variable(amr_data, 0, DATA_LAYOUT::CMC_2D_LAT_LON);
+    //cmc_amr_pre_setup_split_3D_variable(amr_data, 0, DATA_LAYOUT::CMC_2D_LAT_LON);
 
     /* Set a compression criterium - e.g. error threshold with a predefined tolerance */
-    cmc_amr_pre_setup_set_compression_criterium_relative_error_threshold(amr_data, 0.05);
+    cmc_amr_pre_setup_set_compression_criterium_relative_error_threshold(amr_data, 0.25);
     //cmc_amr_pre_setup_set_compression_criterium_absolute_error_threshold(amr_data, 0.00000005);
 
     /* Keep the initial data in order to check the actual introduced data inaccurcy after the decompression */
     cmc_amr_pre_setup_set_flag_in_order_to_keep_the_initial_data(amr_data, 1);
 
     /* Setup the compression for a given 'compression mode' */
-    cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL);
+    cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE);
 
     /* Execute the adaptation/compression */
     cmc_amr_compress(amr_data);

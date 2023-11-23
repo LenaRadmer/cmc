@@ -689,7 +689,7 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
                             }
                             if (current_err > 0.05)
                             {
-                                cmc_debug_msg("Error too large: ", current_err, " at pos: ", i);
+                                //cmc_debug_msg("Error too large: ", current_err, " at pos: ", i);
                             }
                         }
                     }
@@ -725,7 +725,7 @@ cmc_amr_decompress(cmc_amr_data_t amr_data)
     err = MPI_Barrier(amr_data->t8_data->comm);
     cmc_mpi_check_err(err);
     start_time = MPI_Wtime();
-    #if 1
+    #if 0
     cmc_t8_refine_to_initial_level(amr_data->t8_data);
     #else
     cmc_t8_refine_to_initial_level_by_search(amr_data->t8_data);

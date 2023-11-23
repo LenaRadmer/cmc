@@ -3360,7 +3360,7 @@ cmc_t8_refine_to_initial_level(cmc_t8_data_t t8_data)
 
             /* Update the number of elements of the former forest */
             num_elems_former_forest = t8_forest_get_global_num_elements(forest);
-
+                
             /* Create the adapted forest */
             adapted_forest = t8_forest_new_adapt(forest, cmc_t8_adapt_callback_refine_to_initial_lvl, 0, 0, static_cast<void*>(&adapt_data));
 
@@ -3434,7 +3434,8 @@ cmc_t8_refine_to_initial_level(cmc_t8_data_t t8_data)
 
                 /* Create the adapted forest */
                 adapted_forest = t8_forest_new_adapt(forest, cmc_t8_adapt_callback_refine_to_initial_lvl, 0, 0, static_cast<void*>(&adapt_data));
-
+                cmc_debug_msg("Anzahl grober Elemente: ", num_elems_former_forest);
+                cmc_debug_msg("Anzahl feiner Elemente: ", t8_forest_get_global_num_elements(adapted_forest));
                 /* Allocate memory equal to the new elements */
                 t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(adapted_forest)), t8_data->vars[var_id]->get_type());
 
@@ -3537,7 +3538,7 @@ static int t8_search_callback (t8_forest_t forest, t8_locidx_t ltreeid, const t8
     return 1;
 }
 
-/*___________neue Version______________*/
+/* Search with morton-index*/
 #if 1
 /* Create a query callback that will be called for each element once per active query. 
 * It decides wheter or not the query remains active for the children of the element.  */
@@ -3551,9 +3552,6 @@ static int t8_search_query_callback (t8_forest_t forest, t8_locidx_t ltreeid, co
     /* Cast the query pointer to an element pointer. */
     element_to_search_for *particle = (element_to_search_for *) query;
 
-    /*Numerical tolerance for the is_inside_element check. */
-    //const double tolerance = 1e-8;
-    //t8_forest_t ghost_forest =  t8_forest_ghost_create (forest);
     /*Test wheter the Morton index of the fine element is contained in the current element.*/
     morton_index_is_inside = (t8_element_get_linear_id(t8_forest_get_eclass_scheme (forest, t8_forest_get_eclass(forest, 0)), element, t8_element_level(t8_forest_get_eclass_scheme (forest, t8_forest_get_eclass(forest, 0)), element)) == 
                                 t8_element_get_linear_id(t8_forest_get_eclass_scheme (forest, t8_forest_get_eclass(forest, 0)), particle->elem, t8_element_level(t8_forest_get_eclass_scheme (forest, t8_forest_get_eclass(forest, 0)), element))) ? 1 : 0;
@@ -3565,7 +3563,7 @@ static int t8_search_query_callback (t8_forest_t forest, t8_locidx_t ltreeid, co
             * We mark the particle for being inside the partition. */
             /* In order to find the index of the element inside the array, we compute the 
             * index of the element within the tree. */
-            //cmc_debug_msg("Tree leaf index is: ", t8_forest_get_tree_element_offset (forest, ltreeid)+ tree_leaf_index);
+            
             particle->corresponding_coarse_element_id = tree_leaf_index;
             
         }
@@ -3585,7 +3583,7 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
 
     #ifdef CMC_WITH_T8CODE
 
-    /* General variable which can hold a forest. */
+    /* General variables which can hold a forest. */
     t8_forest_t forest;
     t8_forest_t forest_initial_level;
 
@@ -3599,7 +3597,7 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
         forest = t8_data->assets->forest;        
         t8_forest_ref(forest);
         forest_initial_level = forest;
-
+        /*Create the new uniform forest based on the coarse one. */
         forest_initial_level = t8_forest_new_adapt(forest_initial_level, cmc_t8_adapt_callback_refine_to_initial_lvl_by_search, 1, 0, static_cast<void*>(& adapt_data));
         
         /*Create an array for all elements of the new uniform forest. */
@@ -3607,14 +3605,14 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
 
         list_of_elements_to_search_for = sc_array_new_count (sizeof (element_to_search_for), t8_forest_get_local_num_elements(forest_initial_level));
 
-        /* Fill the array with the coordinates of each element. */
+        /* Fill the array with the pointer of each element. */
         for (t8_locidx_t element_id = 0; element_id < t8_forest_get_local_num_elements(forest_initial_level); element_id++) 
         {
             /* Get this particle's pointer. */
             element_to_search_for* current_element_to_search_for = (element_to_search_for *) sc_array_index_int (list_of_elements_to_search_for, element_id);
             /*Save the pointer of the element in our struct.*/
             current_element_to_search_for->elem = t8_forest_get_element_in_tree (forest_initial_level, 0, element_id);
-            //cmc_debug_msg(element_id, "Element id in tree is: ", element_id+rank_id*(t8_forest_get_global_num_elements(forest_initial_level) - t8_forest_get_local_num_elements(forest_initial_level)) );
+            
         }
         
         /* Perform the search of the forest. The second argument is the search callback function,
@@ -3648,7 +3646,7 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
         sc_array_destroy(list_of_elements_to_search_for);
         
 
-        #if 1
+        #if 0
 
         /* Create a vtk data field to hold the vtk data for every variable. */
         t8_vtk_data_field_t* enhanced_decompression_data_array = (t8_vtk_data_field_t*) malloc(sizeof(t8_vtk_data_field_t) * t8_data->vars.size());
@@ -3678,7 +3676,6 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
          /* Set the initial refinement level */
         int initial_refinement_lvl = t8_data->vars[0]->assets->initial_refinement_lvl;
 
-    
         /* Since every variable define its own mesh, we iterate over all variables */
         for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
         {
@@ -3690,65 +3687,65 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
             t8_forest_ref(forest);
             forest_initial_level = forest;
 
+            /*Create the new uniform forest based on the coarse one. */
             forest_initial_level = t8_forest_new_adapt(forest_initial_level, cmc_t8_adapt_callback_refine_to_initial_lvl_by_search, 1, 0, static_cast<void*>(& adapt_data));
-       
-        /*Create an array for all elements of the new uniform forest. */
-        sc_array_t *list_of_elements_to_search_for;
+            
+            /*Create an array for all elements of the new uniform forest. */
+            sc_array_t *list_of_elements_to_search_for;
 
-        list_of_elements_to_search_for = sc_array_new_count (sizeof (element_to_search_for), t8_forest_get_local_num_elements(forest_initial_level));
+            list_of_elements_to_search_for = sc_array_new_count (sizeof (element_to_search_for), t8_forest_get_local_num_elements(forest_initial_level));
 
-        /* Fill the array with the morton-index of each element. */
-        for (t8_locidx_t element_id = 0; element_id < t8_forest_get_local_num_elements(forest_initial_level); element_id++) 
-        {
-            /* Get this particle's pointer. */
-            element_to_search_for*  current_element_to_search_for = (element_to_search_for *) sc_array_index_int(list_of_elements_to_search_for, element_id);
-            
-            current_element_to_search_for->elem= t8_forest_get_element_in_tree (forest_initial_level, 0, element_id);
-            current_element_to_search_for->global_element_id_in_uniform_forest = t8_element_get_linear_id(t8_forest_get_eclass_scheme (forest_initial_level, t8_forest_get_eclass(forest_initial_level, 0)), current_element_to_search_for->elem, initial_refinement_lvl);
-            
-        }
-            
-            /* Perform the search of the forest for the current variable. The second argument is the search callback function,
-            * then the query callback function and the last argument is the array of queries. 
-            * After the search we have found the corresponding_coarse_element_id for all the elements in 
-            * the initial forest that are inside the current variable element. */
-            t8_forest_search (forest, t8_search_callback,
-                                t8_search_query_callback, list_of_elements_to_search_for);
-            
-            /* Allocate memory for data_new array. */
-            t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(forest_initial_level)), 
-                                                                    t8_data->vars[var_id]->get_type());
-                                                                    
-    
-            for (t8_locidx_t i = 0; i < t8_forest_get_local_num_elements(forest_initial_level); ++i) {
-                //Here is the problem!!!
-                /*Get the element, which contains the element of the uniform forest, from the coarse forest 
-                * and copy the data according to that. */
-                size_t current_element = static_cast<size_t>(((element_to_search_for *) t8_sc_array_index_locidx (list_of_elements_to_search_for, i))->corresponding_coarse_element_id);
-                //t8_locidx_t current_element_id_in_tree = static_cast<t8_locidx_t>(((element_to_search_for *) t8_sc_array_index_locidx (list_of_elements_to_search_for, i))->global_element_id_in_uniform_forest);
-               
-                cmc_universal_type_t old_data_value = t8_data->vars[var_id]->var->data->operator[](current_element);
-                //cmc_debug_msg("element_id: ", i, " und platz in neuem array: ", t8_forest_get_local_num_elements(forest_initial_level)*rank+i );
-                /* Copy the old value into data_new. */
-                t8_data->vars[var_id]->var->data_new->assign(i, old_data_value);
+            /* Fill the array with the morton-index of each element. */
+            for (t8_locidx_t element_id = 0; element_id < t8_forest_get_local_num_elements(forest_initial_level); element_id++) 
+            {
+                /* Get this particle's pointer. */
+                element_to_search_for*  current_element_to_search_for = (element_to_search_for *) sc_array_index_int(list_of_elements_to_search_for, element_id);
+                
+                current_element_to_search_for->elem= t8_forest_get_element_in_tree (forest_initial_level, 0, element_id);
+                current_element_to_search_for->global_element_id_in_uniform_forest = t8_element_get_linear_id(t8_forest_get_eclass_scheme (forest_initial_level, t8_forest_get_eclass(forest_initial_level, 0)), current_element_to_search_for->elem, initial_refinement_lvl);
                 
             }
-            /* Replace the old data with the new data and delete them. */
-            t8_data->vars[var_id]->var->switch_data();
+                
+                /* Perform the search of the forest for the current variable. The second argument is the search callback function,
+                * then the query callback function and the last argument is the array of queries. 
+                * After the search we have found the corresponding_coarse_element_id for all the elements in 
+                * the initial forest that are inside the current variable element. */
+                t8_forest_search (forest, t8_search_callback,
+                                    t8_search_query_callback, list_of_elements_to_search_for);
+                
+                /* Allocate memory for data_new array. */
+                t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(forest_initial_level)), 
+                                                                        t8_data->vars[var_id]->get_type());
+                                                                        
+        
+                for (t8_locidx_t i = 0; i < t8_forest_get_local_num_elements(forest_initial_level); ++i) {
+                    
+                    /*Get the element, which contains the element of the uniform forest, from the coarse forest 
+                    * and copy the data according to that. */
+                    size_t current_element = static_cast<size_t>(((element_to_search_for *) t8_sc_array_index_locidx (list_of_elements_to_search_for, i))->corresponding_coarse_element_id);
+                                   
+                    cmc_universal_type_t old_data_value = t8_data->vars[var_id]->var->data->operator[](current_element);
+                    
+                    /* Copy the old value into data_new. */
+                    t8_data->vars[var_id]->var->data_new->assign(i, old_data_value);
+                    
+                }
+                /* Replace the old data with the new data and delete them. */
+                t8_data->vars[var_id]->var->switch_data();
+                
+                /* Deallocate the coarse forest */
+                t8_forest_unref(&forest);
+                
+                forest = cmc_t8_geo_data_repartition_during_decompression(t8_data, forest_initial_level, var_id);
+                
+                /* Save the decompressed forest */
+                t8_data->vars[var_id]->assets->forest = forest;
             
-            /* Deallocate the coarse forest */
-            t8_forest_unref(&forest);
-            
-            forest = cmc_t8_geo_data_repartition_during_decompression(t8_data, forest_initial_level, var_id);
-            
-            /* Save the decompressed forest */
-            t8_data->vars[var_id]->assets->forest = forest;
-           
-            sc_array_destroy(list_of_elements_to_search_for);
-            
+                sc_array_destroy(list_of_elements_to_search_for);
+                
         }
         
-        #if 1
+        #if 0
 
         /* Create a vtk data field to hold the vtk data for every variable. */
         t8_vtk_data_field_t* enhanced_decompression_data_array = (t8_vtk_data_field_t*) malloc(sizeof(t8_vtk_data_field_t) * t8_data->vars.size());
@@ -3773,9 +3770,7 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
     #endif
 }
 
-/*____________Ende neue Version____________*/
-
-/*______________alte Version_______________*/
+/* Search with coordinates of the centroid*/
 #else
 /* Create a query callback that will be called for each element once per active query. 
 * It decides wheter or not the query remains active for the children of the element.  */
@@ -3824,17 +3819,17 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
     t8_forest_t forest;
     t8_forest_t forest_initial_level;
 
-
     cmc_t8_adapt_data adapt_data{t8_data};
     cmc_t8_interpolation_data interpolation_data{t8_data};
+
     /* In case of the One_for_All mode. */
     if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
     {
-        
         /* Set the coarse forest */
         forest = t8_data->assets->forest;
         t8_forest_ref(forest);
         forest_initial_level = forest;
+        /*Create the new uniform forest based on the coarse one. */
         forest_initial_level = t8_forest_new_adapt(forest_initial_level, cmc_t8_adapt_callback_refine_to_initial_lvl_by_search, 1, 0, static_cast<void*>(& adapt_data));
 
         /*Create an array for all elements of the new uniform forest. */
@@ -3885,7 +3880,7 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
         }
         sc_array_destroy(list_of_elements);
 
-        #if 1
+        #if 0
 
         /* Create a vtk data field to hold the vtk data for every variable. */
         t8_vtk_data_field_t* enhanced_decompression_data_array = (t8_vtk_data_field_t*) malloc(sizeof(t8_vtk_data_field_t) * t8_data->vars.size());
@@ -3927,7 +3922,7 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
             
             t8_forest_ref(forest);
             forest_initial_level = forest;
-
+            /*Create the new uniform forest based on the coarse one. */
             forest_initial_level = t8_forest_new_adapt(forest_initial_level, cmc_t8_adapt_callback_refine_to_initial_lvl_by_search, 1, 0, static_cast<void*>(& adapt_data));
             
         /*Create an array for all elements of the new uniform forest. */
@@ -3986,7 +3981,7 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
             sc_array_destroy(list_of_elements);
 
         }
-        #if 1
+        #if 0
 
         /* Create a vtk data field to hold the vtk data for every variable. */
         t8_vtk_data_field_t* enhanced_decompression_data_array = (t8_vtk_data_field_t*) malloc(sizeof(t8_vtk_data_field_t) * t8_data->vars.size());
@@ -4011,7 +4006,6 @@ cmc_t8_refine_to_initial_level_by_search(cmc_t8_data_t t8_data)
     #endif
 }
 #endif
-/*______________Ende alte Version_______________*/
 
 void
 cmc_t8_geo_data_set_relative_error_criterium(cmc_t8_data_t t8_data, const double maximum_error_tolerance)
